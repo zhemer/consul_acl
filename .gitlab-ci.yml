@@ -1,0 +1,14 @@
+image: zhemer/alpine_git
+
+Setting tag:
+  allow_failure: true
+  only:
+   changes:
+     - consul_acl.go
+  script:
+    - |
+      v=v`grep 'const sVer' consul_acl.go|awk -F\" '{print $2}'`
+      if [ -z "`git tag|grep $v`" ];then
+        git tag $v
+        git push --tags https://git-auto-tag-token:$git_auto_tag_token@$CI_SERVER_HOST/$CI_PROJECT_PATH.git HEAD:master
+      fi
