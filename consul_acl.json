@@ -1,10 +1,10 @@
 {
 	"token": [
-		{"Name": "Default client token", "Token":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"], "Descr":"here we are"},
-		{"Name": "vault", "Token":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policy":"policy-vault"},
-		{"Name": "octopus", "Token":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policy":"policy-octopus"},
-		{"Name": "Master Token", "Descr":"skip"},
-		{"Name": "Anonymous Token", "Descr":"skip"}
+		{"Descr": "Default client token", "Token":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"]},
+		{"Descr": "vault", "Token":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policies":["policy-vault"]},
+		{"Descr": "octopus", "Token":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policies":["policy-octopus"]},
+		{"Descr": "Master Token", "Token":"skip"},
+		{"Descr": "Anonymous Token", "Token":"skip"}
 	],
 	"role": [
 		{"Name":"role1", "Descr":"Some Descr", "Policies":["policy-vault","policy-octopus"]},
