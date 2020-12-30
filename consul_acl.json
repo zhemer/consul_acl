@@ -1,17 +1,15 @@
 {
-	"token": [
-		{"Descr": "Default client token", "Token":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"]},
-		{"Descr": "vault", "Token":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policies":["policy-vault"]},
-		{"Descr": "octopus", "Token":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policies":["policy-octopus"]},
-		{"Descr": "Master Token", "Token":"skip"},
-		{"Descr": "Anonymous Token", "Token":"skip"}
+	"Token": [
+		{"Descr": "Default client token", "AccessorID":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"]},
+		{"Descr": "vault", "AccessorID":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policies":["policy-vault"]},
+		{"Descr": "octopus", "AccessorID":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policies":["policy-octopus"]}
 	],
-	"role": [
+	"Role": [
 		{"Name":"role1", "Descr":"Some Descr", "Policies":["policy-vault","policy-octopus"]},
 		{"Name":"role0", "Descr":"skip"},
 		{"Name":"role-octopus", "Policies":["policy-octopus"]}
 	],
-	"policy": [
+	"Policy": [
 		{"Name":"global-management", "Descr":"skip"},
 		{"Name":"policy-vault", "Descr":"Some Descr", "Rules":"key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}\nagent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"},
 		{"Name":"policy-octopus", "Rules":"key \"octopus/\" {policy = \"write\"}"},

@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -33,10 +34,10 @@ type RoleS struct {
 	Policies []string `json:"Policies"`
 }
 type TokenS struct {
-	Descr    string   `json:"Descr"`
-	Policies []string `json:"Policies"`
-	Roles    []string `json:"Roles"`
-	Token    string   `json:"Token"`
+	Descr      string   `json:"Descr"`
+	Policies   []string `json:"Policies"`
+	Roles      []string `json:"Roles"`
+	AccessorID string   `json:"AccessorID"`
 }
 type ConsulAcl struct {
 	Policy []PolicyS
@@ -102,7 +103,7 @@ func main() {
 	aclToken := map[string]TokenS{}
 	for _, v := range aclList.Token {
 		Log("--- %q\n", v)
-		aclToken[v.Descr] = v
+		aclToken[v.AccessorID] = v
 	}
 	Log("== aclToken %q\n\n", aclToken)
 
@@ -288,60 +289,68 @@ func main() {
 		Log("== token=%v err=%v\n\n", token, err)
 
 		// Skipping marked token
-		if aclToken[token.Description].Token == sKip || token.Description == sTokMaster || token.Description == sTokAnon {
+		if aclToken[token.Description].AccessorID == sKip || token.Description == sTokMaster || token.Description == sTokAnon {
 			Log("Skipping token %q\n", token.Description)
 			delete(aclToken, token.Description)
 			continue
 		}
 
 		// Removing unknown and legacy tokens
-		if aclToken[token.Description].Descr == "" || len(token.Rules) > 0 {
+		if aclToken[token.AccessorID].AccessorID == "" || len(token.Rules) > 0 {
 			if _, err := acl.TokenDelete(token.AccessorID, nil); err != nil {
-				log.Fatalf("%v: %q\n", err, token)
+				log.Fatalf("TokenDelete: %v: %q\n", err, token)
 			} else {
-				fmt.Printf("Removed token %q\n", token.Description)
+				fmt.Printf("Removed token %q\n", token.AccessorID)
 			}
 			continue
 		}
 
-		aclToken1[token.Description] = token.AccessorID
+		aclToken1[token.AccessorID] = token.AccessorID
 
+		change := ""
+		if token.Description != aclToken[token.AccessorID].Descr {
+			change = "Description: '" + token.Description + "' => '" + aclToken[token.AccessorID].Descr + "', "
+			token.Description = aclToken[token.AccessorID].Descr
+
+		}
 		// Creating policy list to comapre
 		pl := []string{}
 		for _, p := range token.Policies {
 			pl = append(pl, p.Name)
 		}
 		sort.Strings(pl)
-		sort.Strings(aclToken[token.Description].Policies)
-		Log("=== pl %q %q %q %q\n\n", pl, aclToken[token.Description].Policies, token.Description, aclToken[token.Description].Descr)
-		// Updating token's policy list
-		// if len(token.Policies) != 1 || token.Policies[0].Name != aclToken[token.Description].Policy {
-		if reflect.DeepEqual(pl, aclToken[token.Description].Policies) == false || token.Description != aclToken[token.Description].Descr {
-			// pl := api.ACLTokenPolicyLink{"", aclToken[token.Description].Policy}
-			// token.Policies = []*api.ACLTokenPolicyLink{&pl}
-			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.Description].Policies)
+		sort.Strings(aclToken[token.AccessorID].Policies)
+		// Log("=== pl %q %q %q %q\n\n", pl, aclToken[token.AccessorID].Policies, token.Description, aclToken[token.AccessorID].Descr)
 
+		// Updating token's policy list
+		if reflect.DeepEqual(pl, aclToken[token.AccessorID].Policies) == false || token.Description != aclToken[token.AccessorID].Descr {
+			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.AccessorID].Policies)
+			change += "Policies: '" + strings.Join(pl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Policies, ",") + "', "
+
+		}
+		if change != "" {
+			change = strings.TrimRight(change, ", ")
 			if _, _, err := acl.TokenUpdate(token, nil); err != nil {
 				// log.Fatalf("len(token.Policies)!=1 %v: %v(%v)\n", err, token.Description, token.AccessorID)
-				log.Fatalf("Update token policy %v: %q\n", err, token)
+				log.Fatalf("TokenUpdate: %v: %q\n", err, token)
 			} else {
-				fmt.Printf("Updated token %q(%q) policy to %q\n", token.Description, token.AccessorID, aclToken[token.Description].Policies)
+				fmt.Printf("Updated token %q(%q): %q\n", token.Description, token.AccessorID, change)
 			}
 		}
-		delete(aclToken, token.Description)
+		delete(aclToken, token.AccessorID)
 	}
 
 	// Creating absent tokens
 	for _, v := range aclToken {
-		if v.Token == sKip {
+		if v.AccessorID == sKip {
 			continue
 		}
 
 		poList := CreatePolicyRoleList(aclPol1, v.Policies)
 		roList := CreatePolicyRoleList(aclRole1, v.Roles)
-		if _, _, err := acl.TokenCreate(&api.ACLToken{AccessorID: v.Token, SecretID: v.Token, Description: v.Descr,
+		if _, _, err := acl.TokenCreate(&api.ACLToken{AccessorID: v.AccessorID, Description: v.Descr,
 			Policies: poList, Roles: roList}, nil); err != nil {
-			log.Fatalf("%v: %v\n", err, v)
+			log.Fatalf("TokenCreate: %v: %v\n", err, v)
 		} else {
 			fmt.Printf("Created token %q\n", v)
 		}
@@ -349,6 +358,10 @@ func main() {
 	// Token end
 
 } // main
+
+// ==================================================
+// functions
+// ==================================================
 
 func PolicyRead(acl *api.ACL) (polList []*api.ACLPolicy, err error) {
 	aclPolList, _, e := acl.PolicyList(nil)
