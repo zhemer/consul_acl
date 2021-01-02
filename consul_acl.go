@@ -15,11 +15,10 @@ import (
 )
 
 const (
-	sVer       = "0.0.4"
+	sVer       = "0.0.5"
 	sAddrDef   = "localhost"
 	sKip       = "skip"
-	sTokAnon   = "Anonymous Token"
-	sTokMaster = "Master Token"
+	sTokAnon   = "anonymous"
 	sPolMaster = "global-management"
 )
 
@@ -118,6 +117,7 @@ func main() {
 	if *sToken != "" {
 		config.Token = *sToken
 	}
+	Log("config.Token %v\n", config.Token)
 
 	if *sAddr != sAddrDef {
 		config.Address = *sAddr + ":8500"
@@ -277,12 +277,12 @@ func main() {
 	aclToken1 := map[string]string{}
 	for _, token := range acL.toList {
 		token, _, err := acl.TokenRead(token.AccessorID, nil)
-		Log("\n== token=%v err=%v\n\n", token, err)
+		Log("\n== token=%+v err=%v\n\n", token, err)
 
 		// Skipping marked token
-		if aclToken[token.Description].AccessorID == sKip || token.Description == sTokMaster || token.Description == sTokAnon {
+		if aclToken[token.AccessorID].AccessorID == sKip || token.SecretID == config.Token || token.SecretID == sTokAnon {
 			Log("Skipping token %q\n", token.Description)
-			delete(aclToken, token.Description)
+			delete(aclToken, token.AccessorID)
 			continue
 		}
 
