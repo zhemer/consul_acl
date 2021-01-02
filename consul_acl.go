@@ -129,34 +129,16 @@ func main() {
 
 	acl := client.ACL()
 
-	Log("\nacL ====================\n\n")
-	// ===============================
+	// Read whole ACL into acL variable
 	var acL AclList
 	if err := acL.GetList(acl); err != nil {
 		log.Fatalf("GetList: %v\n", err)
 	}
-	// for k, v := range acL.poList {
-	// 	Log("== k %q v %q\n", k, v)
-	// }
-	// Log("===========\n")
-	// for k, v := range acL.roList {
-	// 	Log("== k %q v %q\n", k, v)
-	// }
-	// Log("===========\n")
-	// for k, v := range acL.toList {
-	// 	Log("== k %q v %q\n", k, v)
-	// }
-	// return
 
 	// ===========================================================
 	// Policy
 	// ===========================================================
 	aclPol1 := map[string]string{}
-	// aclPolList, err := PolicyRead(acl)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, pol := range aclPolList {
 	for _, pol := range acL.poList {
 		Log("== policy=%v err=%v\n\n", pol, err)
 
@@ -169,7 +151,7 @@ func main() {
 		// Removing unknown policy
 		if aclPol[pol.Name].Name == "" {
 			if _, err := acl.PolicyDelete(pol.ID, nil); err != nil {
-				log.Fatalf("%v: %q\n", err, pol)
+				log.Fatalf("PolicyDelete: %v: %q\n", err, pol)
 			} else {
 				fmt.Printf("Removed policy %q\n", pol.Name)
 			}
@@ -179,22 +161,24 @@ func main() {
 		aclPol1[pol.Name] = pol.ID
 
 		change := ""
-		// Updating policy
-		if pol.Rules != aclPol[pol.Name].Rules {
-			change = "Rules '" + pol.Rules + "' => '" + aclPol[pol.Name].Rules + "'"
-			pol.Rules = aclPol[pol.Name].Rules
-		}
+		// Checking policy's description
 		if pol.Description != aclPol[pol.Name].Descr {
-			change += "Description '" + pol.Description + "' => '" + aclPol[pol.Name].Descr + "'"
+			change = "Description: '" + pol.Description + "' => '" + aclPol[pol.Name].Descr + "', "
 			pol.Description = aclPol[pol.Name].Descr
 		}
+		if pol.Rules != aclPol[pol.Name].Rules {
+			change += "Rules: '" + pol.Rules + "' => '" + aclPol[pol.Name].Rules + "'"
+			pol.Rules = aclPol[pol.Name].Rules
+		}
+		// Updating policy
 		if change != "" {
+			change = strings.TrimRight(change, ", ")
 			_, _, err := acl.PolicyUpdate(pol, nil)
 			if err != nil {
 				log.Fatal(err)
-				log.Fatalf("%v: %q\n", err, pol)
+				log.Fatalf("PolicyUpdate: %v: %q\n", err, pol)
 			} else {
-				fmt.Printf("Updated policy %q (%s)\n", pol.Name, change)
+				fmt.Printf("Updated policy %q: %s\n", pol.Name, change)
 			}
 		}
 		delete(aclPol, pol.Name)
@@ -208,7 +192,7 @@ func main() {
 		}
 		_, _, err := acl.PolicyCreate(&api.ACLPolicy{Name: k, Rules: v.Rules, Description: v.Descr}, nil)
 		if err != nil {
-			log.Fatalf("%v: %q\n", err, v)
+			log.Fatalf("PolicyCreate: %v: %q\n", err, v)
 		} else {
 			fmt.Printf("Created policy %q\n", k)
 		}
@@ -219,14 +203,7 @@ func main() {
 	// Role
 	// ===========================================================
 	aclRole1 := map[string]string{}
-	// aclRoleList, wm, err := acl.RoleList(nil)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// Log("==== acl.RoleList %v %v %v\n", aclRoleList, wm, err)
-	// for _, role := range aclRoleList {
 	for _, role := range acL.roList {
-		role, _, err := acl.RoleRead(role.ID, nil)
 		Log("== role=%v err=%v\n\n", role, err)
 
 		// Skipping marked role
@@ -238,7 +215,7 @@ func main() {
 		// Removing unknown role
 		if aclRole[role.Name].Name == "" {
 			if _, err := acl.RoleDelete(role.ID, nil); err != nil {
-				log.Fatalf("%v: %q\n", err, role)
+				log.Fatalf("RoleDelete: %v: %q\n", err, role)
 			} else {
 				fmt.Printf("Removed role %q\n", role.Name)
 			}
@@ -247,21 +224,30 @@ func main() {
 
 		aclRole1[role.Name] = role.ID
 
+		change := ""
+		// Checking role's description
+		if role.Description != aclRole[role.Name].Descr {
+			change += "Description: '" + role.Description + "' => '" + aclRole[role.Name].Descr + "', "
+			role.Description = aclRole[role.Name].Descr
+		}
 		// Creating policy list to comapre
 		pl := []string{}
 		for _, p := range role.Policies {
 			pl = append(pl, p.Name)
 		}
-		// Updating role
 		if StrArrCmp(pl, aclRole[role.Name].Policies) == false || role.Description != aclRole[role.Name].Descr {
+			change += "Policies: '" + strings.Join(pl, ",") + "' => '" + strings.Join(aclRole[role.Name].Policies, ",") + "'"
 			role.Policies = CreatePolicyRoleList(aclPol1, aclRole[role.Name].Policies)
-			role.Description = aclRole[role.Name].Descr
+		}
+		// Updating role
+		if change != "" {
+			change = strings.TrimRight(change, ", ")
 			_, _, err := acl.RoleUpdate(role, nil)
 			if err != nil {
 				log.Fatal(err)
 				log.Fatalf("RoleUpdate: %v: %q\n", err, role)
 			} else {
-				fmt.Printf("Updated role %q\n", role.Name)
+				fmt.Printf("Updated role %q: %s\n", role.Name, change)
 			}
 		}
 		delete(aclRole, role.Name)
@@ -317,7 +303,7 @@ func main() {
 		aclToken1[token.AccessorID] = token.AccessorID
 
 		change := ""
-		// Updating token's Description
+		// Checking token's description
 		if token.Description != aclToken[token.AccessorID].Descr {
 			change = "Description: '" + token.Description + "' => '" + aclToken[token.AccessorID].Descr + "', "
 			token.Description = aclToken[token.AccessorID].Descr
@@ -343,7 +329,7 @@ func main() {
 		Log("=== rl %q %q %q\n", rl, aclToken[token.AccessorID].Roles, StrArrCmp(rl, aclToken[token.AccessorID].Roles))
 		// Updating token's roles list
 		if StrArrCmp(rl, aclToken[token.AccessorID].Roles) == false {
-			change += "Roles: '" + strings.Join(rl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Roles, ",") + "', "
+			change += "Roles: '" + strings.Join(rl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Roles, ",") + "'"
 			token.Roles = CreatePolicyRoleList(aclRole1, aclToken[token.AccessorID].Roles)
 		}
 
@@ -353,7 +339,7 @@ func main() {
 			if _, _, err := acl.TokenUpdate(token, nil); err != nil {
 				log.Fatalf("TokenUpdate: %v: %q\n", err, token)
 			} else {
-				fmt.Printf("Updated token %q(%q): %q\n", token.Description, token.AccessorID, change)
+				fmt.Printf("Updated token %q (%q): %q\n", token.Description, token.AccessorID, change)
 			}
 		}
 		delete(aclToken, token.AccessorID)
@@ -378,31 +364,9 @@ func main() {
 
 } // main
 
-// Declare an Interface Type and methods does not have a body
-type Employee interface {
-	PrintName() string                // Method with string return type
-	PrintAddress(id int)              // Method with int parameter
-	PrintSalary(b int, t int) float64 // Method with parameters and return type
-}
-
 // ==================================================
-// functions
+// Functions and structures
 // ==================================================
-
-func PolicyRead(acl *api.ACL) (polList []*api.ACLPolicy, err error) {
-	aclPolList, _, e := acl.PolicyList(nil)
-	if err = e; e != nil {
-		return
-	}
-	for _, pol := range aclPolList {
-		policy, _, e := acl.PolicyRead(pol.ID, nil)
-		if err = e; e != nil {
-			return
-		}
-		polList = append(polList, policy)
-	}
-	return polList, err
-}
 
 type AclList struct {
 	poList   []*api.ACLPolicy
@@ -421,7 +385,6 @@ func (al *AclList) GetList(acl *api.ACL) error {
 		if err != nil {
 			return err
 		}
-		// Log("p %q\n", policy)
 		al.poList = append(al.poList, policy)
 	}
 
