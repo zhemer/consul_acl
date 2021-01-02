@@ -2,6 +2,8 @@
 
 consul_acl allows to maintain desired Consul's ACL set state specified in input file by -f command switch.
 Input file must follow JSON format and certain [structure](consul_acl.json). Server's address and master token can be specified by -a and -t switches.
+This can be used with configuration management tools like Chef or Ansible that still unable to operate on new non-legacy ACL.
+Consul must operate in [new non-legacy ACL mode](https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#140-november-14-2018) in order to consul_acl operate right.
 
 ```shell
 $ ./consul_acl 
