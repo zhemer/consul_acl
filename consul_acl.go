@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"reflect"
+	// "reflect"
 	"sort"
 	"strings"
 	"time"
@@ -129,12 +129,22 @@ func main() {
 
 	acl := client.ACL()
 
-	// aclList1, err1 := PolicyRead(acl)
-	// if err != nil {
-	// 	log.Fatal("err1 %v\n", err1)
+	Log("\nacL ====================\n\n")
+	// ===============================
+	var acL AclList
+	if err := acL.GetList(acl); err != nil {
+		log.Fatalf("GetList: %v\n", err)
+	}
+	// for k, v := range acL.poList {
+	// 	Log("== k %q v %q\n", k, v)
 	// }
-	// for _, p := range aclList1 {
-	// 	fmt.Printf("== p == %v\n", p)
+	// Log("===========\n")
+	// for k, v := range acL.roList {
+	// 	Log("== k %q v %q\n", k, v)
+	// }
+	// Log("===========\n")
+	// for k, v := range acL.toList {
+	// 	Log("== k %q v %q\n", k, v)
 	// }
 	// return
 
@@ -142,11 +152,12 @@ func main() {
 	// Policy
 	// ===========================================================
 	aclPol1 := map[string]string{}
-	aclPolList, err := PolicyRead(acl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, pol := range aclPolList {
+	// aclPolList, err := PolicyRead(acl)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// for _, pol := range aclPolList {
+	for _, pol := range acL.poList {
 		Log("== policy=%v err=%v\n\n", pol, err)
 
 		// Skipping marked policy
@@ -208,12 +219,13 @@ func main() {
 	// Role
 	// ===========================================================
 	aclRole1 := map[string]string{}
-	aclRoleList, wm, err := acl.RoleList(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	Log("==== acl.RoleList %v %v %v\n", aclRoleList, wm, err)
-	for _, role := range aclRoleList {
+	// aclRoleList, wm, err := acl.RoleList(nil)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// Log("==== acl.RoleList %v %v %v\n", aclRoleList, wm, err)
+	// for _, role := range aclRoleList {
+	for _, role := range acL.roList {
 		role, _, err := acl.RoleRead(role.ID, nil)
 		Log("== role=%v err=%v\n\n", role, err)
 
@@ -225,7 +237,7 @@ func main() {
 
 		// Removing unknown role
 		if aclRole[role.Name].Name == "" {
-			if _, err := acl.PolicyDelete(role.ID, nil); err != nil {
+			if _, err := acl.RoleDelete(role.ID, nil); err != nil {
 				log.Fatalf("%v: %q\n", err, role)
 			} else {
 				fmt.Printf("Removed role %q\n", role.Name)
@@ -240,17 +252,14 @@ func main() {
 		for _, p := range role.Policies {
 			pl = append(pl, p.Name)
 		}
-		sort.Strings(pl)
-		sort.Strings(aclRole[role.Name].Policies)
-
 		// Updating role
-		if reflect.DeepEqual(pl, aclRole[role.Name].Policies) == false || role.Description != aclRole[role.Name].Descr {
+		if StrArrCmp(pl, aclRole[role.Name].Policies) == false || role.Description != aclRole[role.Name].Descr {
 			role.Policies = CreatePolicyRoleList(aclPol1, aclRole[role.Name].Policies)
 			role.Description = aclRole[role.Name].Descr
 			_, _, err := acl.RoleUpdate(role, nil)
 			if err != nil {
 				log.Fatal(err)
-				log.Fatalf("%v: %q\n", err, role)
+				log.Fatalf("RoleUpdate: %v: %q\n", err, role)
 			} else {
 				fmt.Printf("Updated role %q\n", role.Name)
 			}
@@ -265,10 +274,10 @@ func main() {
 			continue
 		}
 		poList := CreatePolicyRoleList(aclPol1, v.Policies)
-		_, _, err := acl.RoleCreate(&api.ACLRole{Name: k, Policies: poList, Description: v.Descr}, nil)
-		if err != nil {
+
+		if _, _, err := acl.RoleCreate(&api.ACLRole{Name: k, Policies: poList, Description: v.Descr}, nil); err != nil {
 			log.Fatal(err)
-			log.Fatalf("%v: %q\n", err, v)
+			log.Fatalf("RoleCreate: %v: %q\n", err, v)
 		} else {
 			fmt.Printf("Created role %q\n", k)
 		}
@@ -286,7 +295,7 @@ func main() {
 	Log("==== acl.TokenList %v %v %v\n", aclTokenList, wm, err)
 	for _, token := range aclTokenList {
 		token, _, err := acl.TokenRead(token.AccessorID, nil)
-		Log("== token=%v err=%v\n\n", token, err)
+		Log("\n== token=%v err=%v\n\n", token, err)
 
 		// Skipping marked token
 		if aclToken[token.Description].AccessorID == sKip || token.Description == sTokMaster || token.Description == sTokAnon {
@@ -308,6 +317,7 @@ func main() {
 		aclToken1[token.AccessorID] = token.AccessorID
 
 		change := ""
+		// Updating token's Description
 		if token.Description != aclToken[token.AccessorID].Descr {
 			change = "Description: '" + token.Description + "' => '" + aclToken[token.AccessorID].Descr + "', "
 			token.Description = aclToken[token.AccessorID].Descr
@@ -318,20 +328,29 @@ func main() {
 		for _, p := range token.Policies {
 			pl = append(pl, p.Name)
 		}
-		sort.Strings(pl)
-		sort.Strings(aclToken[token.AccessorID].Policies)
-		// Log("=== pl %q %q %q %q\n\n", pl, aclToken[token.AccessorID].Policies, token.Description, aclToken[token.AccessorID].Descr)
-
+		Log("=== pl %q %q\n\n", pl, aclToken[token.AccessorID].Policies)
 		// Updating token's policy list
-		if reflect.DeepEqual(pl, aclToken[token.AccessorID].Policies) == false || token.Description != aclToken[token.AccessorID].Descr {
-			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.AccessorID].Policies)
+		if StrArrCmp(pl, aclToken[token.AccessorID].Policies) == false {
 			change += "Policies: '" + strings.Join(pl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Policies, ",") + "', "
-
+			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.AccessorID].Policies)
 		}
+
+		// Creating roles list to comapre
+		rl := []string{}
+		for _, p := range token.Roles {
+			rl = append(rl, p.Name)
+		}
+		Log("=== rl %q %q %q\n", rl, aclToken[token.AccessorID].Roles, StrArrCmp(rl, aclToken[token.AccessorID].Roles))
+		// Updating token's roles list
+		if StrArrCmp(rl, aclToken[token.AccessorID].Roles) == false {
+			change += "Roles: '" + strings.Join(rl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Roles, ",") + "', "
+			token.Roles = CreatePolicyRoleList(aclRole1, aclToken[token.AccessorID].Roles)
+		}
+
+		// Updating token
 		if change != "" {
 			change = strings.TrimRight(change, ", ")
 			if _, _, err := acl.TokenUpdate(token, nil); err != nil {
-				// log.Fatalf("len(token.Policies)!=1 %v: %v(%v)\n", err, token.Description, token.AccessorID)
 				log.Fatalf("TokenUpdate: %v: %q\n", err, token)
 			} else {
 				fmt.Printf("Updated token %q(%q): %q\n", token.Description, token.AccessorID, change)
@@ -359,6 +378,13 @@ func main() {
 
 } // main
 
+// Declare an Interface Type and methods does not have a body
+type Employee interface {
+	PrintName() string                // Method with string return type
+	PrintAddress(id int)              // Method with int parameter
+	PrintSalary(b int, t int) float64 // Method with parameters and return type
+}
+
 // ==================================================
 // functions
 // ==================================================
@@ -378,6 +404,54 @@ func PolicyRead(acl *api.ACL) (polList []*api.ACLPolicy, err error) {
 	return polList, err
 }
 
+type AclList struct {
+	poList   []*api.ACLPolicy
+	roList   []*api.ACLRole
+	toList   []*api.ACLToken
+	poListLe []*api.ACLPolicyListEntry
+}
+
+func (al *AclList) GetList(acl *api.ACL) error {
+	aclPoList, _, err := acl.PolicyList(nil)
+	if err != nil {
+		return err
+	}
+	for _, pol := range aclPoList {
+		policy, _, err := acl.PolicyRead(pol.ID, nil)
+		if err != nil {
+			return err
+		}
+		// Log("p %q\n", policy)
+		al.poList = append(al.poList, policy)
+	}
+
+	aclRoList, _, err := acl.RoleList(nil)
+	if err != nil {
+		return err
+	}
+	for _, role := range aclRoList {
+		role, _, err := acl.RoleRead(role.ID, nil)
+		if err != nil {
+			return err
+		}
+		al.roList = append(al.roList, role)
+	}
+
+	aclToList, _, err := acl.TokenList(nil)
+	if err != nil {
+		return err
+	}
+	for _, token := range aclToList {
+		token, _, err := acl.TokenRead(token.AccessorID, nil)
+		if err != nil {
+			return err
+		}
+		al.toList = append(al.toList, token)
+	}
+
+	return nil
+}
+
 func CreatePolicyRoleList(prList map[string]string, list []string) []*api.ACLLink {
 	pr := []*api.ACLLink{}
 	for _, p := range list {
@@ -390,4 +464,22 @@ func Log(format string, a ...interface{}) {
 	if *iDebug == true {
 		fmt.Printf(format, a...)
 	}
+}
+
+func StrArrCmp(a1, a2 []string) bool {
+	rc := true
+	if len(a1)+len(a2) == 0 {
+		return true
+	}
+	if len(a1) != len(a2) {
+		return false
+	}
+	sort.Strings(a1)
+	sort.Strings(a2)
+	for i := range a1 {
+		if a1[i] != a2[i] {
+			return false
+		}
+	}
+	return rc
 }
