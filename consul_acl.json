@@ -1,17 +1,21 @@
 {
 	"Token": [
-		{"Descr": "Default client token", "AccessorID":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"]},
-		{"Descr": "vault", "AccessorID":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policies":["policy-vault"]},
-		{"Descr": "octopus", "AccessorID":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policies":["policy-octopus"]}
+		{"Descr": "kube", "AccessorID":"a58ce363-646b-4a6b-bd93-26a038170619", "Policies":["pol-kube"], "Roles":["role1"]},
+		{"Descr": "vault", "AccessorID":"f6774eb5-17df-45af-818b-4f7742defe69", "Policies":["pol-vault"]},
+		{"Descr": "octopus", "AccessorID":"70422b37-4526-4513-87c4-04be72540dc0", "Policies":["pol-octopus"]},
+		{"Descr": "nginx", "AccessorID":"70422b37-4526-4513-87c4-04be72540dc0", "Policies":["pol-nginx"]}
 	],
 	"Role": [
-		{"Name":"role1", "Descr":"Some Descr", "Policies":["policy-vault","policy-octopus"]},
-		{"Name":"role0", "Descr":"skip"},
-		{"Name":"role-octopus", "Policies":["policy-octopus"]}
+		{"Name":"role1", "Descr":"Some Descr", "Policies":["pol-vault","pol-octopus"]},
+		{"Name":"role-nginx", "Descr":"skip"},
+		{"Name":"role-octopus", "Policies":["pol-octopus"]},
+		{"Name":"role-nginx", "Policies":["pol-nginx"]}
 	],
 	"Policy": [
-		{"Name":"policy-vault", "Descr":"Some Descr", "Rules":"key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}\nagent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"},
-		{"Name":"policy-octopus", "Rules":"key \"octopus/\" {policy = \"write\"}"},
-		{"Name":"policy-default-client", "Rules":"check \"\" {policy=\"write\"}\nservice \"\" {policy=\"write\"}\nkey \"consul-alerts/\" {policy=\"write\"}\nkeyring = \"write\""}
+		{"Name":"pol-vault", "Descr":"Some Descr", "Rules":"key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}"},
+		{"Name":"pol-octopus", "Rules":"key \"octopus/\" {policy = \"write\"}"},
+		{"Name":"pol-kube", "Rules":"check \"\" {policy=\"write\"}\nservice \"\" {policy=\"write\"}\nkey \"consul-alerts/\" {policy=\"write\"}\nkeyring = \"write\""},
+		{"Name":"pol-nginx", "Rules":"agent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"}
 	]
+	
 }
