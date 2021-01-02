@@ -10,7 +10,6 @@
 		{"Name":"role-octopus", "Policies":["policy-octopus"]}
 	],
 	"Policy": [
-		{"Name":"global-management", "Descr":"skip"},
 		{"Name":"policy-vault", "Descr":"Some Descr", "Rules":"key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}\nagent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"},
 		{"Name":"policy-octopus", "Rules":"key \"octopus/\" {policy = \"write\"}"},
 		{"Name":"policy-default-client", "Rules":"check \"\" {policy=\"write\"}\nservice \"\" {policy=\"write\"}\nkey \"consul-alerts/\" {policy=\"write\"}\nkeyring = \"write\""}
