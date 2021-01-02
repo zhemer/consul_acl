@@ -3,7 +3,7 @@
 consul_acl allows to maintain desired Consul's ACL set state specified in input file by -f command switch.
 Input file must follow JSON format and certain [structure](consul_acl.json). Server's address and master token can be specified by -a and -t switches.
 
-```console
+```shell
 $ ./consul_acl 
 You must specify file in JSON format
 Maintain Consul's ACL in required state, described in JSON file specified by -f parameter
@@ -20,7 +20,7 @@ Usage: ./consul_acl -f <file> [-d]
 ```
 
 Setting Consul's ACL:
-```console
+```shell
 $ ./consul_acl -f consul_acl.json -t master-token -a vm-centos
 Created policy "policy-default-client"
 Created role "role1"
@@ -29,7 +29,7 @@ Created token {"Default client token" ["policy-octopus"] ["role1"] "8e576c87-ce7
 ```
 
 Checking again:
-```console
+```shell
 $ ./consul_acl -f consul_acl.json -t master-token -a vm-centos
 $
 ```
