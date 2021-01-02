@@ -2,7 +2,7 @@
 	"Token": [
 		{"Descr": "Default client token", "AccessorID":"8e576c87-ce71-436c-925a-0e24e0b11c52", "Policies":["policy-octopus"], "Roles":["role1"]},
 		{"Descr": "vault", "AccessorID":"9e6acf6a-c74b-41eb-8843-0e3ddad0a855", "Policies":["policy-vault"]},
-		{"Descr": "octopus", "AccessorID":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7"}
+		{"Descr": "octopus", "AccessorID":"aafb482d-3524-4a87-b7ca-cfe3687ee4e7", "Policies":["policy-octopus"]}
 	],
 	"Role": [
 		{"Name":"role1", "Descr":"Some Descr", "Policies":["policy-vault","policy-octopus"]},
