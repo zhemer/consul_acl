@@ -5,13 +5,14 @@ Input file must follow JSON format and certain [structure](consul_acl.json). Ser
 This can be used with configuration management tools like Chef or Ansible that still unable to operate on new non-legacy ACL.
 Consul must operate in [new non-legacy ACL mode](https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#140-november-14-2018) in order to consul_acl operate right.\
 Control tokens 'Master Token', 'Anonymous Token' and policy 'global-management' are skipped.\
-Master token can also be passed through CONSUL_HTTP_TOKEN environment variable.
+Master token can also be passed through CONSUL_HTTP_TOKEN environment variable.\
+Token scope - global or local - can be set ONLY during token creation, Consul API doesn't allow to toggle it after that - token must be re-created with appropriate locality.
 
 ```shell
 $ ./consul_acl 
 You must specify file in JSON format
 Maintain Consul's ACL in required state, described in JSON file specified by -f parameter
-Version 0.0.5
+Version 0.0.6
 Usage: ./consul_acl -f <file> [-d]
   -a string
     	Consul server address (default "localhost")
