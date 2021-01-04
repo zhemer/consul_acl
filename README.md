@@ -7,20 +7,90 @@ Consul must operate in [new non-legacy ACL mode](https://github.com/hashicorp/co
 Control tokens 'Master Token', 'Anonymous Token' and policy 'global-management' are skipped.\
 Master token can also be passed through CONSUL_HTTP_TOKEN environment variable.\
 Token scope - global or local - can be set ONLY during token creation, Consul API doesn't allow to toggle it after that - token must be re-created with appropriate locality.
+Current Consul' ACL set can be dumped to terminal (file) in JSON format appropriate for input file specified by -f switch. And as configuration dumped unformatted, better to format it by jq:
+```shell
 
+$ ./consul_acl -a vm-centos -t $t -d|jq
+{
+  "Policy": [
+    {
+      "Name": "pol-nginx",
+      "Rules": "agent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"
+    },
+    {
+      "Name": "pol-octopus",
+      "Rules": "key \"octopus/\" {policy = \"write\"}"
+    },
+    {
+      "Name": "pol-dc",
+      "Rules": "node \"\" {policy=\"read\"}",
+      "Dc": [
+        "dc1"
+      ]
+    }
+  ],
+  "Role": [
+    {
+      "Name": "role-nginx",
+      "Policies": [
+        "pol-nginx"
+      ]
+    },
+    {
+      "Descr": "Some Descr",
+      "Name": "role1",
+      "Policies": [
+        "pol-octopus",
+        "pol-vault"
+      ]
+    }
+  ],
+  "Token": [
+    {
+      "Descr": "kube",
+      "Policies": [
+        "pol-kube"
+      ],
+      "Roles": [
+        "role1"
+      ],
+      "AccessorID": "a58ce363-646b-4a6b-bd93-26a038170630",
+      "Local": true
+    },
+    {
+      "Descr": "nginx",
+      "Policies": [
+        "pol-nginx"
+      ],
+      "AccessorID": "01496e9c-ba84-4d1f-a2e0-747c415f6f8d"
+    },
+    {
+      "Descr": "octopus",
+      "Policies": [
+        "pol-octopus"
+      ],
+      "AccessorID": "70422b37-4526-4513-87c4-04be72540dc0"
+    }
+  ]
+}
+```
+
+Help screen:
 ```shell
 $ ./consul_acl 
-You must specify file in JSON format
-Maintain Consul's ACL in required state, described in JSON file specified by -f parameter
-Version 0.0.6
-Usage: ./consul_acl -f <file> [-d]
+You must specify one of mandatory switch: '-f' or '-d'
+Maintains Consul's ACL in required state, described in JSON file specified by -f switch.
+Consul ACL can be saved (dumped) to terminal beforehand using -d switch.
+Version 0.0.7
+Usage: ./consul_acl [-f <file> | -d] [-a address] [-t token] [-d]
   -a string
     	Consul server address (default "localhost")
-  -d	Tune on verbose output
+  -d	Dump ACL
   -f string
     	JSON file name with Consul ACL set
   -t string
     	ACL agent token
+  -v	Tune on verbose output
 
 ```
 
@@ -42,10 +112,4 @@ Removed token "629e6ca8-971c-470b-badd-80babdd1a7df"
 Created token {"nginx" ["pol-nginx"] [] "70422b37-4526-4513-87c4-04be72540dc0"}
 Created token {"kube" ["pol-kube"] ["role1"] "a58ce363-646b-4a6b-bd93-26a038170619"}
 Created token {"vault" ["pol-vault"] [] "f6774eb5-17df-45af-818b-4f7742defe69"}
-```
-
-Checking again:
-```shell
-$ ./consul_acl -f consul_acl.json -t master-token -a vm-centos
-$
 ```
