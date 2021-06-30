@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	sVer       = "0.0.7"
+	sVer       = "0.0.8"
 	sAddrDef   = "localhost"
 	sKip       = "skip"
 	sTokAnon   = "anonymous"
@@ -36,25 +36,38 @@ type RoleS struct {
 	Policies []string `json:"Policies,omitempty"`
 }
 type TokenS struct {
-	Descr      string   `json:"Descr,omitempty"`
-	Policies   []string `json:"Policies,omitempty"`
-	Roles      []string `json:"Roles,omitempty"`
-	AccessorID string   `json:"AccessorID"`
-	Local      bool     `json:"Local,omitempty"`
+	Descr    string   `json:"Descr,omitempty"`
+	Policies []string `json:"Policies,omitempty"`
+	Roles    []string `json:"Roles,omitempty"`
+	SecretID string   `json:"Token"`
+	Local    bool     `json:"Local,omitempty"`
 }
 type ConsulAcl struct {
-	Policy []PolicyS
-	Role   []RoleS `json:"Role,omitempty"`
-	Token  []TokenS
+	Policies []PolicyS
+	Roles    []RoleS `json:"Roles,omitempty"`
+	Tokens   []TokenS
 }
 
 var (
 	sFileAcl = flag.String("f", "", "JSON file name with Consul ACL set")
 	sAddr    = flag.String("a", sAddrDef, "Consul server address")
-	sToken   = flag.String("t", "", "ACL agent token")
-	iDebug   = flag.Bool("v", false, "Tune on verbose output")
-	iDump    = flag.Bool("d", false, "Dump ACL")
+	sToken   = flag.String("t", "", "Consul agent token")
+	iDebug   = flag.Bool("v", false, "Enable verbose output")
+	iDump    = flag.Bool("d", false, "Dump current ACL")
 )
+
+type AclList struct {
+	poList []*api.ACLPolicy
+	roList []*api.ACLRole
+	toList []*api.ACLToken
+	// poListLe []*api.ACLPolicyListEntry
+}
+
+var aclList ConsulAcl
+var acL AclList
+var aclToken = map[string]TokenS{}
+var aclRole = map[string]RoleS{}
+var aclPol = map[string]PolicyS{}
 
 func main() {
 	flag.Usage = func() {
@@ -76,11 +89,11 @@ Version %s
 	// Connect to Consul
 	acl, config := ConsulConnect(sToken, sAddr)
 	if acl == nil {
-		log.Fatalf("ConsulConnect returned empty ACL\n")
+		log.Fatalf("ConsulConnect returned an empty ACL\n")
 	}
 
 	// Read whole ACL into acL variable
-	var acL AclList
+	// var acL AclList
 	if err := acL.GetList(acl, config.Token); err != nil {
 		log.Fatalf("GetList: %v\n", err)
 	}
@@ -104,36 +117,46 @@ Version %s
 		log.Fatal(*sFileAcl + ": invalid JSON format\n")
 	}
 
-	var aclList ConsulAcl
+	// var aclList ConsulAcl
 	err = json.Unmarshal([]byte(data), &aclList)
 	if err != nil {
 		log.Fatal(err)
 	}
 	Log("aclList %+v\n\n", aclList)
+	if len(aclList.Policies) == 0 || len(aclList.Tokens) == 0 {
+		log.Fatalf("Error: input file's policies/tokens list can't be empty\n")
+	}
 
 	// Creating policy hash from parsed JSON
-	aclPol := map[string]PolicyS{}
-	for _, v := range aclList.Policy {
-		Log("--- %+v\n", v)
+	// aclPol := map[string]PolicyS{}
+	for _, v := range aclList.Policies {
+		Log("policy %+v\n\n", v)
+		if v.Name == "" {
+			log.Fatalf("Policy 'Name' can't be empty: %v\n", v)
+		}
 		aclPol[v.Name] = v
 	}
-	Log("== aclPol %+v\n\n", aclPol)
+	Log("\n== aclPol %+v\n\n", aclPol)
 
 	// Creating role hash from parsed JSON
-	aclRole := map[string]RoleS{}
-	for _, v := range aclList.Role {
-		Log("--- %+v\n", v)
+	// aclRole := map[string]RoleS{}
+	for _, v := range aclList.Roles {
+		Log("role %+v\n", v)
 		aclRole[v.Name] = v
 	}
 	Log("== aclRole %+v\n\n", aclRole)
 
 	// Creating token hash from parsed JSON
-	aclToken := map[string]TokenS{}
-	for _, v := range aclList.Token {
-		Log("--- %+v\n", v)
-		aclToken[v.AccessorID] = v
+	// aclToken := map[string]TokenS{}
+	for _, v := range aclList.Tokens {
+		Log("token %+v\n\n", v)
+		if v.SecretID == "" {
+			log.Fatalf("Token 'SecretID'('Token') can't be empty: %v\n", v)
+		}
+		aclToken[v.SecretID] = v
 	}
 	Log("== aclToken %+v\n\n", aclToken)
+	// return
 
 	// ===========================================================
 	// Policy
@@ -161,7 +184,7 @@ Version %s
 		aclPol1[pol.Name] = pol.ID
 		change := ""
 
-		Log("=== dc %q %q %v\n", pol.Datacenters, aclPol[pol.Name].Dc, StrArrCmp(pol.Datacenters, aclPol[pol.Name].Dc))
+		Log("== policy Datacenters %q %q %v\n\n", pol.Datacenters, aclPol[pol.Name].Dc, StrArrCmp(pol.Datacenters, aclPol[pol.Name].Dc))
 		// Checking policy's datacenter
 		if StrArrCmp(pol.Datacenters, aclPol[pol.Name].Dc) == false {
 			change = "Datacenters: '" + strings.Join(pol.Datacenters, ",") + "' => '" + strings.Join(aclPol[pol.Name].Dc, ",") + "', "
@@ -280,35 +303,41 @@ Version %s
 	// ===========================================================
 	// Token
 	// ===========================================================
+	Log("========= aclToken %+v\n", aclToken)
+	Log("========= acL.toList %+v\n", acL.toList)
+
 	aclToken1 := map[string]string{}
 	for _, token := range acL.toList {
 		token, _, err := acl.TokenRead(token.AccessorID, nil)
-		Log("\n== token=%+v err=%v\n\n", token, err)
+		Log("\n== token %+v\n\n", token)
+		if err != nil {
+			log.Fatalf("TokenRead error: %v\n", err)
+		}
 
 		// Skipping marked token
-		if aclToken[token.AccessorID].AccessorID == sKip || token.SecretID == config.Token || token.SecretID == sTokAnon {
-			Log("Skipping token %q\n", token.Description)
-			delete(aclToken, token.AccessorID)
+		if aclToken[token.SecretID].SecretID == sKip || token.SecretID == config.Token || token.SecretID == sTokAnon {
+			Log("Skipping token %q (%v)\n", token.Description, token.SecretID)
+			delete(aclToken, token.SecretID)
 			continue
 		}
 
 		// Removing unknown and legacy tokens
-		if aclToken[token.AccessorID].AccessorID == "" || len(token.Rules) > 0 {
-			if _, err := acl.TokenDelete(token.AccessorID, nil); err != nil {
+		if aclToken[token.SecretID].SecretID == "" || len(token.Rules) > 0 {
+			if _, err := acl.TokenDelete(token.SecretID, nil); err != nil {
 				log.Fatalf("TokenDelete: %v: %v\n", err, token)
 			} else {
-				fmt.Printf("Removed token %q\n", token.AccessorID)
+				fmt.Printf("Removed token %q (%q)\n", token.Description, token)
 			}
 			continue
 		}
 
-		aclToken1[token.AccessorID] = token.AccessorID
+		aclToken1[token.SecretID] = token.SecretID
 
 		change := ""
 		// Checking token's description
-		if token.Description != aclToken[token.AccessorID].Descr {
-			change = "Description: '" + token.Description + "' => '" + aclToken[token.AccessorID].Descr + "', "
-			token.Description = aclToken[token.AccessorID].Descr
+		if token.Description != aclToken[token.SecretID].Descr {
+			change = "Description: '" + token.Description + "' => '" + aclToken[token.SecretID].Descr + "', "
+			token.Description = aclToken[token.SecretID].Descr
 
 		}
 		// Creating policy list to comapre
@@ -316,11 +345,11 @@ Version %s
 		for _, p := range token.Policies {
 			pl = append(pl, p.Name)
 		}
-		Log("=== pl %q %q\n\n", pl, aclToken[token.AccessorID].Policies)
+		Log("=== Policies: server: %q file: %q StrArrCmp: %v\n\n", pl, aclToken[token.SecretID].Policies, StrArrCmp(pl, aclToken[token.SecretID].Policies))
 		// Updating token's policy list
-		if StrArrCmp(pl, aclToken[token.AccessorID].Policies) == false {
-			change += "Policies: '" + strings.Join(pl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Policies, ",") + "', "
-			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.AccessorID].Policies)
+		if StrArrCmp(pl, aclToken[token.SecretID].Policies) == false {
+			change += "Policies: '" + strings.Join(pl, ",") + "' => '" + strings.Join(aclToken[token.SecretID].Policies, ",") + "', "
+			token.Policies = CreatePolicyRoleList(aclPol1, aclToken[token.SecretID].Policies)
 		}
 
 		// Creating roles list to comapre
@@ -328,11 +357,11 @@ Version %s
 		for _, p := range token.Roles {
 			rl = append(rl, p.Name)
 		}
-		Log("=== rl %q %q %v\n", rl, aclToken[token.AccessorID].Roles, StrArrCmp(rl, aclToken[token.AccessorID].Roles))
+		Log("=== Roles: server: %q file: %q StrArrCmp: %v\n\n", rl, aclToken[token.SecretID].Roles, StrArrCmp(rl, aclToken[token.SecretID].Roles))
 		// Updating token's roles list
-		if StrArrCmp(rl, aclToken[token.AccessorID].Roles) == false {
-			change += "Roles: '" + strings.Join(rl, ",") + "' => '" + strings.Join(aclToken[token.AccessorID].Roles, ",") + "'"
-			token.Roles = CreatePolicyRoleList(aclRole1, aclToken[token.AccessorID].Roles)
+		if StrArrCmp(rl, aclToken[token.SecretID].Roles) == false {
+			change += "Roles: '" + strings.Join(rl, ",") + "' => '" + strings.Join(aclToken[token.SecretID].Roles, ",") + "'"
+			token.Roles = CreatePolicyRoleList(aclRole1, aclToken[token.SecretID].Roles)
 		}
 
 		// Updating token
@@ -341,25 +370,25 @@ Version %s
 			if _, _, err := acl.TokenUpdate(token, nil); err != nil {
 				log.Fatalf("TokenUpdate: %v: %v\n", err, token)
 			} else {
-				fmt.Printf("Updated token %q (%q): %q\n", token.Description, token.AccessorID, change)
+				fmt.Printf("Updated token %q (%q): %q\n", token.Description, token.SecretID, change)
 			}
 		}
-		delete(aclToken, token.AccessorID)
+		delete(aclToken, token.SecretID)
 	}
+	Log("\n")
 
+	Log("========= aclToken %+v\n", aclToken)
 	// Creating absent tokens
 	for _, v := range aclToken {
-		if v.AccessorID == sKip {
+		if v.SecretID == sKip {
 			continue
 		}
-
 		poList := CreatePolicyRoleList(aclPol1, v.Policies)
 		roList := CreatePolicyRoleList(aclRole1, v.Roles)
-		if _, _, err := acl.TokenCreate(&api.ACLToken{AccessorID: v.AccessorID, Description: v.Descr,
-			Policies: poList, Roles: roList, Local: v.Local}, nil); err != nil {
-			log.Fatalf("TokenCreate: %v: %v\n", err, v)
+		if _, _, err := acl.TokenCreate(&api.ACLToken{SecretID: v.SecretID, Description: v.Descr, Policies: poList, Roles: roList, Local: v.Local}, nil); err != nil {
+			log.Fatalf("TokenCreate: %v: %+v\n", err, v)
 		} else {
-			fmt.Printf("Created token %q\n", v)
+			fmt.Printf("Created token %+v\n", v)
 		}
 	}
 	// Token end
@@ -369,13 +398,6 @@ Version %s
 // ==================================================
 // Functions and structures
 // ==================================================
-
-type AclList struct {
-	poList []*api.ACLPolicy
-	roList []*api.ACLRole
-	toList []*api.ACLToken
-	// poListLe []*api.ACLPolicyListEntry
-}
 
 func (al *AclList) GetList(acl *api.ACL, sTokMaster string) error {
 	aclPoList, _, err := acl.PolicyList(nil)
@@ -422,6 +444,7 @@ func (al *AclList) GetList(acl *api.ACL, sTokMaster string) error {
 
 	return nil
 }
+
 func (al *AclList) Dump() (string, error) {
 	var po []PolicyS
 	var ro []RoleS
@@ -444,13 +467,13 @@ func (al *AclList) Dump() (string, error) {
 	for _, tok := range al.toList {
 		v := TokenS{}
 		v.Descr = tok.Description
-		v.AccessorID = tok.AccessorID
+		v.SecretID = tok.SecretID
 		v.Policies = RoleTokenToStrA(tok.Policies)
 		v.Roles = RoleTokenToStrA(tok.Roles)
 		v.Local = tok.Local
 		to = append(to, v)
 	}
-	acl := ConsulAcl{Policy: po, Role: ro, Token: to}
+	acl := ConsulAcl{Policies: po, Roles: ro, Tokens: to}
 	Log("acl %+v\n\n", acl)
 	bJson, err := json.Marshal(acl)
 	if err != nil {
