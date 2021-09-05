@@ -81,7 +81,7 @@ $ ./consul_acl
 You must specify one of mandatory switch: '-f' or '-d'
 Maintains Consul's ACL in required state, described in JSON file specified by -f switch.
 Consul ACL can be saved (dumped) to terminal beforehand using -d switch.
-Version 0.0.7
+Version 0.0.8
 Usage: ./consul_acl [-f <file> | -d] [-a address] [-t token] [-d]
   -a string
     	Consul server address (default "localhost")
