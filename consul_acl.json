@@ -1,21 +1,74 @@
 {
-	"Tokens": [
-		{"Local":true, "Descr": "kube", "Token":"a58ce363-646b-4a6b-bd93-26a038170630", "Policies":["pol-kube"], "Roles":["role1"]},
-		{"Descr": "vault", "Token":"f6774eb5-17df-45af-818b-4f7742defe69", "Policies":["pol-vault"]},
-		{"Descr": "octopus", "Token":"70422b37-4526-4513-87c4-04be72540dc0", "Policies":["pol-octopus"]},
-		{"Descr": "nginx", "Token":  "01496e9c-ba84-4d1f-a2e0-747c415f6f8d", "Policies":["pol-nginx"]}
-	],
-	"Roles": [
-		{"Name":"role1", "Descr":"Some Descr", "Policies":["pol-vault","pol-octopus"]},
-		{"Name":"role-nginx", "Descr":"skip"},
-		{"Name":"role-octopus", "Policies":["pol-octopus"]},
-		{"Name":"role-nginx", "Policies":["pol-nginx"]}
-	],
-	"Policies": [
-		{"Name":"pol-vault", "Descr":"Some Descr", "Rules":"key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}"},
-		{"Name":"pol-octopus", "Rules":"key \"octopus/\" {policy = \"write\"}"},
-		{"Name":"pol-kube", "Rules":"check \"\" {policy=\"write\"}\nservice \"\" {policy=\"write\"}\nkey \"consul-alerts/\" {policy=\"write\"}\nkeyring = \"write\""},
-		{"Name":"pol-nginx", "Rules":"agent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"},
-		{"Name":"pol-dc", "Rules":"node \"\" {policy=\"read\"}", "Dc":["dc1"]}
-	]
+  "Policies": {
+    "policy-dc": {
+      "Description": "policy Description",
+      "Rules": "node \"\" {policy=\"read\"}",
+      "Dc": [
+        "dc1"
+      ]
+    },
+    "pol-kube": {
+      "Rules": "check \"\" {policy=\"write\"}\nservice \"\" {policy=\"write\"}\nkey \"consul-alerts/\" {policy=\"write\"}\nkeyring = \"write\""
+    },
+    "pol-nginx": {
+      "Rules": "agent \"\" {policy=\"write\"}\nsession \"\" {policy=\"write\"}"
+    },
+    "pol-octopus": {
+      "Rules": "key \"octopus/\" {policy = \"write\"}"
+    },
+    "pol-vault": {
+      "Description": "Some Descr",
+      "Rules": "key \"vault/\" {policy=\"write\"}\nnode \"\" {policy = \"write\"}\nservice \"vault\" {policy=\"write\"}"
+    }
+  },
+  "Roles": {
+    "role-nginx": {
+      "Policies": [
+        "pol-nginx"
+      ]
+    },
+    "role-octopus": {
+      "Policies": [
+        "pol-octopus",
+        "policy-dc"
+      ]
+    },
+    "role1": {
+      "Description": "Some Descr",
+      "Policies": [
+        "pol-vault",
+        "pol-octopus"
+      ]
+    }
+  },
+  "Tokens": {
+    "01496e9c-ba84-4d1f-a2e0-747c415f6f8d": {
+      "Description": "nginx",
+      "Policies": [
+        "pol-nginx"
+      ]
+    },
+    "70422b37-4526-4513-87c4-04be72540dc0": {
+      "Description": "octopus",
+      "Policies": [
+        "pol-octopus"
+      ]
+    },
+    "a58ce363-646b-4a6b-bd93-26a038170630": {
+      "Description": "kube",
+      "Policies": [
+        "pol-kube"
+      ],
+      "Roles": [
+        "role1"
+      ],
+      "Local": true
+    },
+    "f6774eb5-17df-45af-818b-4f7742defe69": {
+      "Description": "vault",
+      "Policies": [
+        "pol-vault"
+      ]
+    }
+  }
 }
