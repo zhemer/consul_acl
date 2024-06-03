@@ -8,7 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"sort"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/consul/api"
@@ -61,11 +61,12 @@ Version %s
 	} else if consulAcl == nil {
 		log.Fatalf("Error: ConsulConnect returned an empty ACL")
 	}
-	dumpAcl := Acl{consulAcl: consulAcl, consulToken: agentToken}
 
 	// Dump ACL as JSON if isDump was specified
 	if *isDump {
-		if aclJson, err := dumpAcl.Dump(); err == nil {
+		acl := Acl{consulAcl: consulAcl, consulToken: agentToken}
+		aclJson, err := acl.Dump()
+		if err == nil {
 			fmt.Print(aclJson)
 			return
 		}
@@ -107,23 +108,6 @@ func StringMapToACLLinkList(stringMap map[string]string, list []string) []*api.A
 	return links
 }
 
-func StringsListsCompare(a1, a2 []string) bool {
-	if len(a1)+len(a2) == 0 {
-		return true
-	}
-	if len(a1) != len(a2) {
-		return false
-	}
-	sort.Strings(a1)
-	sort.Strings(a2)
-	for i := range a1 {
-		if a1[i] != a2[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func ACLLinkToStringList(aclLink []*api.ACLLink) (list []string) {
 	for _, link := range aclLink {
 		list = append(list, link.Name)
@@ -143,6 +127,14 @@ func ConsulConnect(token string, address string, port string) (*api.ACL, error) 
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: %w", err)
+	}
+	// Dirty hack to check connection to Consul since api.NewClient() doesn't do it
+	_, _, err = client.ACL().AuthMethodList(nil)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unexpected response code") {
+			return nil, errors.New("invalid master token")
+		}
+		return nil, fmt.Errorf("AuthMethodList: %w", err)
 	}
 	return client.ACL(), nil
 }

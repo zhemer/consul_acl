@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"log"
 	"log/slog"
+	"slices"
 	"strings"
 )
 
@@ -37,9 +38,8 @@ type Acl struct {
 
 // Dump Consul ACL to string
 // TODO: make pretty formatted json
-func (acl *Acl) Dump() (string, error) {
+func (acl Acl) Dump() (string, error) {
 	policies := map[string]Policy{}
-	//for _, policy := range policyList {
 	policyList, err := acl.GetPolicyList()
 	if err != nil {
 		return "", fmt.Errorf("GetPolicyList: %w", err)
@@ -85,7 +85,7 @@ func (acl *Acl) Dump() (string, error) {
 	return string(aclJson), nil
 }
 
-// Ensure Consul ACL policies list equils to the our.json list
+// Ensure Consul ACL policies list equals to the our.json list
 func (acl Acl) SyncPolicies() (map[string]string, error) {
 	policyNameToId := map[string]string{}
 
@@ -114,14 +114,16 @@ func (acl Acl) SyncPolicies() (map[string]string, error) {
 		policyNameToId[policy.Name] = policy.ID
 		change := ""
 
-		slog.Debug(fmt.Sprintf("policy Datacenters %q %q %v", policy.Datacenters,
-			acl.Policies[policy.Name].Dc, StringsListsCompare(policy.Datacenters, acl.Policies[policy.Name].Dc)))
 		// Checking policy datacenter
-		if !StringsListsCompare(policy.Datacenters, acl.Policies[policy.Name].Dc) {
+		isListsEqual := slices.Compare(policy.Datacenters, acl.Policies[policy.Name].Dc)
+		slog.Debug(fmt.Sprintf("policy Datacenters %q %q %v", policy.Datacenters,
+			acl.Policies[policy.Name].Dc, isListsEqual == 0))
+		if isListsEqual != 0 {
 			change = "Datacenters: '" + strings.Join(policy.Datacenters, ",") + "' => '" +
 				strings.Join(acl.Policies[policy.Name].Dc, ",") + "', "
 			policy.Datacenters = acl.Policies[policy.Name].Dc
 		}
+
 		// Checking policy description
 		if policy.Description != acl.Policies[policy.Name].Description {
 			change += "Description: '" + policy.Description + "' => '" + acl.Policies[policy.Name].Description + "', "
@@ -159,10 +161,9 @@ func (acl Acl) SyncPolicies() (map[string]string, error) {
 	return policyNameToId, nil
 }
 
-// Ensure Consul ACL roles list equils to the our.json list
+// Ensure Consul ACL roles list equals to the our.json list
 func (acl Acl) SyncRoles(policyNameToId map[string]string) (map[string]string, error) {
 	roleNameToId := map[string]string{}
-
 	roleList, err := acl.GetRoleList()
 	if err != nil {
 		return nil, fmt.Errorf("GetRoleList: %w", err)
@@ -171,7 +172,7 @@ func (acl Acl) SyncRoles(policyNameToId map[string]string) (map[string]string, e
 	for _, role := range roleList {
 		slog.Debug(fmt.Sprintf("role=%+v", role))
 
-		// Skipping marked role
+		// Skipping marked as "skip" in Description role
 		if acl.Roles[role.Name].Description == sKip {
 			slog.Debug(fmt.Sprintf("Skipping role %q", role.Name))
 			continue
@@ -187,22 +188,21 @@ func (acl Acl) SyncRoles(policyNameToId map[string]string) (map[string]string, e
 		}
 
 		roleNameToId[role.Name] = role.ID
-
 		change := ""
+
 		// Checking role's description
 		if role.Description != acl.Roles[role.Name].Description {
 			change += "Description: '" + role.Description + "' => '" + acl.Roles[role.Name].Description + "', "
 			role.Description = acl.Roles[role.Name].Description
 		}
-		// Creating roles policy list to compare
-		var rpl []string
-		for _, p := range role.Policies {
-			rpl = append(rpl, p.Name)
-		}
-		if !StringsListsCompare(rpl, acl.Roles[role.Name].Policies) || role.Description != acl.Roles[role.Name].Description {
-			change += "Policies: '" + strings.Join(rpl, ",") + "' => '" + strings.Join(acl.Roles[role.Name].Policies, ",") + "'"
+
+		// Creating role's policy list to compare
+		rolePoliciesList := ACLLinkToStringList(role.Policies)
+		if slices.Compare(rolePoliciesList, acl.Roles[role.Name].Policies) != 0 || role.Description != acl.Roles[role.Name].Description {
+			change += "Policies: '" + strings.Join(rolePoliciesList, ",") + "' => '" + strings.Join(acl.Roles[role.Name].Policies, ",") + "'"
 			role.Policies = StringMapToACLLinkList(policyNameToId, acl.Roles[role.Name].Policies)
 		}
+
 		// Updating role
 		if change != "" {
 			change = strings.TrimRight(change, ", ")
@@ -231,9 +231,8 @@ func (acl Acl) SyncRoles(policyNameToId map[string]string) (map[string]string, e
 	return roleNameToId, nil
 }
 
-// Ensure Consul ACL tokens list equils to the our.json list
+// Ensure Consul ACL tokens list equals to the our.json list
 func (acl Acl) SyncTokens(policyNameToId map[string]string, roleNameToId map[string]string) error {
-
 	tokenList, err := acl.GetTokenList()
 	if err != nil {
 		return fmt.Errorf("GetTokenList: %w", err)
@@ -264,38 +263,36 @@ func (acl Acl) SyncTokens(policyNameToId map[string]string, roleNameToId map[str
 		}
 
 		change := ""
+
 		// Checking token description
 		if token.Description != acl.Tokens[token.SecretID].Description {
 			change = "Description: '" + token.Description + "' => '" + acl.Tokens[token.SecretID].Description + "', "
 			token.Description = acl.Tokens[token.SecretID].Description
 
 		}
-		// Creating tokens policy list to compare
-		var tokenPolicyList []string
-		for _, p := range token.Policies {
-			tokenPolicyList = append(tokenPolicyList, p.Name)
-		}
-		slog.Debug(fmt.Sprintf("Policies: server: %q file: %q StringsListsCompare: %v", tokenPolicyList,
-			acl.Tokens[token.SecretID].Policies,
-			StringsListsCompare(tokenPolicyList, acl.Tokens[token.SecretID].Policies)))
+
+		// Creating token's policy list to compare
+		tokenPolicyList := ACLLinkToStringList(token.Policies)
+		isListsEquals := slices.Compare(tokenPolicyList, acl.Tokens[token.SecretID].Policies)
+		slog.Debug(fmt.Sprintf("Policies: server: %q file: %q isListsEquals: %v", tokenPolicyList,
+			acl.Tokens[token.SecretID].Policies, isListsEquals == 0))
+
 		// Updating token policy list
-		if !StringsListsCompare(tokenPolicyList, acl.Tokens[token.SecretID].Policies) {
+		if isListsEquals != 0 {
 			change += "Policies: '" + strings.Join(tokenPolicyList, ",") + "' => '" +
 				strings.Join(acl.Tokens[token.SecretID].Policies, ",") + "', "
 			token.Policies = StringMapToACLLinkList(policyNameToId, acl.Tokens[token.SecretID].Policies)
 		}
 
-		// Creating token  roles list to compare
-		var tokeRoleList []string
-		for _, p := range token.Roles {
-			tokeRoleList = append(tokeRoleList, p.Name)
-		}
-		slog.Debug(fmt.Sprintf("Roles: server: %q file: %q StringsListsCompare: %v", tokeRoleList,
-			acl.Tokens[token.SecretID].Roles,
-			StringsListsCompare(tokeRoleList, acl.Tokens[token.SecretID].Roles)))
+		// Creating token's roles list to compare
+		tokenRoleList := ACLLinkToStringList(token.Roles)
+		isListsEquals = slices.Compare(tokenRoleList, acl.Tokens[token.SecretID].Roles)
+		slog.Debug(fmt.Sprintf("Roles: server: %q file: %q isListsEquals: %v", tokenRoleList,
+			acl.Tokens[token.SecretID].Roles, isListsEquals == 0))
+
 		// Updating token's roles list
-		if !StringsListsCompare(tokeRoleList, acl.Tokens[token.SecretID].Roles) {
-			change += "Roles: '" + strings.Join(tokeRoleList, ",") + "' => '" + strings.Join(acl.Tokens[token.SecretID].Roles, ",") + "'"
+		if isListsEquals != 0 {
+			change += "Roles: '" + strings.Join(tokenRoleList, ",") + "' => '" + strings.Join(acl.Tokens[token.SecretID].Roles, ",") + "'"
 			token.Roles = StringMapToACLLinkList(roleNameToId, acl.Tokens[token.SecretID].Roles)
 		}
 
@@ -305,7 +302,7 @@ func (acl Acl) SyncTokens(policyNameToId map[string]string, roleNameToId map[str
 			if _, _, err := acl.consulAcl.TokenUpdate(token, nil); err != nil {
 				return fmt.Errorf("TokenUpdate for %v: %w", token, err)
 			}
-			log.Printf("Updated token %q (%q): %q", token.Description, token.SecretID, change)
+			log.Printf("Updated token %q (%v): %q", token.Description, token.SecretID, change)
 		}
 		delete(acl.Tokens, token.SecretID)
 	}
@@ -329,7 +326,7 @@ func (acl Acl) SyncTokens(policyNameToId map[string]string, roleNameToId map[str
 }
 
 // Get policies list from Consul
-func (acl *Acl) GetPolicyList() ([]*api.ACLPolicy, error) {
+func (acl Acl) GetPolicyList() ([]*api.ACLPolicy, error) {
 	var policyList []*api.ACLPolicy
 	aclPolicyList, _, err := acl.consulAcl.PolicyList(nil)
 	if err != nil {
@@ -349,7 +346,7 @@ func (acl *Acl) GetPolicyList() ([]*api.ACLPolicy, error) {
 }
 
 // Get roles list from Consul
-func (acl *Acl) GetRoleList() ([]*api.ACLRole, error) {
+func (acl Acl) GetRoleList() ([]*api.ACLRole, error) {
 	var roleList []*api.ACLRole
 	aclRoleList, _, err := acl.consulAcl.RoleList(nil)
 	if err != nil {
@@ -366,7 +363,7 @@ func (acl *Acl) GetRoleList() ([]*api.ACLRole, error) {
 }
 
 // Get tokens list from Consul
-func (acl *Acl) GetTokenList() ([]*api.ACLToken, error) {
+func (acl Acl) GetTokenList() ([]*api.ACLToken, error) {
 	var tokenList []*api.ACLToken
 	aclTokenList, _, err := acl.consulAcl.TokenList(nil)
 	if err != nil {

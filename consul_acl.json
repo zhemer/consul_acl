@@ -46,12 +46,17 @@
       "Description": "nginx",
       "Policies": [
         "pol-nginx"
+      ],
+      "Roles": [
+        "role-nginx",
+        "role-octopus"
       ]
     },
     "70422b37-4526-4513-87c4-04be72540dc0": {
       "Description": "octopus",
       "Policies": [
-        "pol-octopus"
+        "pol-octopus",
+        "pol-nginx"
       ]
     },
     "a58ce363-646b-4a6b-bd93-26a038170630": {
@@ -67,7 +72,10 @@
     "f6774eb5-17df-45af-818b-4f7742defe69": {
       "Description": "vault",
       "Policies": [
-        "pol-vault"
+        "pol-vault",
+        "pol-kube",
+        "pol-nginx"
+
       ]
     }
   }
